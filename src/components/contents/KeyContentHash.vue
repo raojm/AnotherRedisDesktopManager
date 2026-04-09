@@ -327,6 +327,9 @@ export default {
       // 尝试解析 ZigScript 组件，返回预览字符串
       if (!buf || buf.length < 8) return '';
 
+      // 先验证是否为 ZigScript 格式，避免误判 JSON 等其他格式
+      if (!this.$util.isZigscript(buf)) return '';
+
       try {
         const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
         const id = view.getUint16(4, true);

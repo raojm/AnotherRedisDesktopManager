@@ -165,6 +165,7 @@ export default {
     // ZigScript Component 格式检测
     // C++ 兼容格式: [size:u16][version:u16][id:u16][flag:u16] = 8 bytes header + data
     // 支持输入为 Buffer 或转义字符串两种格式
+    // 精确判断: component size + header长度(8) == 总 value 长度
 
     if (!buf) return false;
 
@@ -198,9 +199,9 @@ export default {
       const componentId = view.getUint16(4, true);
       const flag = view.getUint16(6, true);
 
-      // size 应该接近 buffer 长度（允许较大误差）
-      if (size > 65535) return false;
-      if (Math.abs(size - (buffer.length - 8)) > 512) return false;
+      // 精确判断: component size + header长度(8) 必须等于 buffer 总长度
+      // 这是 ZigScript 格式的关键特征，可以避免误判 JSON 等其他格式
+      if (size + 8 !== buffer.length) return false;
 
       // version 通常在 1-65535 范围内
       if (version > 65535) return false;
