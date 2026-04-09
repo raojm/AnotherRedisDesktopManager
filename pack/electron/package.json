@@ -65,7 +65,6 @@
       "extendInfo": {
         "ElectronTeamID": "68JN8DV835"
       }
-    },
-    "afterSign": "pack/scripts/notarize.js"
+    }
   }
 }
