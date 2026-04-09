@@ -57,7 +57,10 @@
         </vxe-column>
         <vxe-column field="value" title="Value" sortable>
           <template v-slot="scope">
-            {{ $util.cutString($util.bufToString(scope.row.value), 100) }}
+            <div class="value-cell">
+              <div class="value-preview">{{ getZigscriptPreview(scope.row.value) }}</div>
+              <div class="value-raw">{{ $util.cutString($util.bufToString(scope.row.value), 80) }}</div>
+            </div>
           </template>
         </vxe-column>
         <vxe-column v-if="ttlSupport" field="ttl" title="TTL" width="100" sortable></vxe-column>
@@ -231,6 +234,110 @@ export default {
     getScanMatch() {
       return this.filterValue ? `*${this.filterValue}*` : '*';
     },
+    getZigscriptPreview(buf) {
+      // 尝试解析 ZigScript 组件，返回预览字符串
+      if (!buf || buf.length < 8) return '';
+
+      try {
+        const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+        const id = view.getUint16(4, true);
+
+        // 组件定义（名称 + 字段）
+        const defs = {
+          10: { name: 'EntityUniqueID', fields: [{ n: 'unique_id', t: 'u64' }] },
+          11: { name: 'OwnerEntityUniqueID', fields: [{ n: 'owner_unique_id', t: 'u64' }] },
+          12: { name: 'EntityInitStatus', fields: [{ n: 'status', t: 'u8' }] },
+          13: { name: 'ServerEntityTag', fields: [] },
+          14: { name: 'GameRoomTag', fields: [] },
+          15: { name: 'GameTableTag', fields: [] },
+          16: { name: 'GameEntityTag', fields: [] },
+          17: { name: 'LocalGameEntityTag', fields: [] },
+          18: { name: 'RequestEntityTag', fields: [] },
+          19: { name: 'LocalRequestTag', fields: [] },
+          100: { name: 'Player', fields: [{ n: 'player_id', t: 'u64' }, { n: 'level', t: 'u32' }, { n: 'exp', t: 'u64' }, { n: 'nickname', t: 'string' }] },
+          101: { name: 'PlayerProperty', fields: [{ n: 'hp', t: 'i32' }, { n: 'max_hp', t: 'i32' }, { n: 'mp', t: 'i32' }, { n: 'max_mp', t: 'i32' }, { n: 'attack', t: 'i32' }, { n: 'defense', t: 'i32' }, { n: 'is_dead', t: 'u8' }, { n: 'level', t: 'u32' }, { n: 'exp', t: 'u64' }] },
+          102: { name: 'PlayerInfo', fields: [{ n: 'player_uin', t: 'u64' }, { n: 'game_id', t: 'u32' }, { n: 'gold', t: 'u32' }, { n: 'diamond', t: 'u32' }, { n: 'vip_level', t: 'u32' }] },
+          200: { name: 'AuthenRequest', fields: [{ n: 'account', t: 'string' }, { n: 'password', t: 'string' }, { n: 'app_id', t: 'u32' }, { n: 'device_type', t: 'u8' }, { n: 'login_type', t: 'u8' }] },
+          201: { name: 'AuthenResponse', fields: [{ n: 'result_code', t: 'i32' }, { n: 'player_uin', t: 'u64' }, { n: 'session_id', t: 'u64' }, { n: 'error_message', t: 'string' }] },
+          300: { name: 'Position', fields: [{ n: 'x', t: 'f32' }, { n: 'y', t: 'f32' }, { n: 'z', t: 'f32' }] },
+          301: { name: 'Velocity', fields: [{ n: 'vx', t: 'f32' }, { n: 'vy', t: 'f32' }, { n: 'vz', t: 'f32' }] },
+          302: { name: 'Rotation', fields: [{ n: 'pitch', t: 'f32' }, { n: 'yaw', t: 'f32' }, { n: 'roll', t: 'f32' }] },
+          400: { name: 'ClientState', fields: [{ n: 'is_background', t: 'u8' }, { n: 'afk_time_ms', t: 'u32' }] },
+          401: { name: 'SkillState', fields: [{ n: 'skill_id', t: 'u32' }, { n: 'last_use_time', t: 'u64' }, { n: 'cooldown', t: 'u32' }, { n: 'target_id', t: 'u64' }] },
+          402: { name: 'QuestState', fields: [{ n: 'quest_id', t: 'u32' }, { n: 'status', t: 'u8' }, { n: 'progress', t: 'u8' }] },
+          403: { name: 'Inventory', fields: [{ n: 'item_id_1', t: 'u32' }, { n: 'count_1', t: 'u32' }, { n: 'item_id_2', t: 'u32' }, { n: 'count_2', t: 'u32' }, { n: 'item_id_3', t: 'u32' }, { n: 'count_3', t: 'u32' }, { n: 'gold', t: 'u64' }] },
+          404: { name: 'CombatEffect', fields: [{ n: 'effect_type', t: 'u32' }, { n: 'effect_id', t: 'u32' }, { n: 'duration_ms', t: 'u32' }, { n: 'source_id', t: 'u64' }, { n: 'target_id', t: 'u64' }, { n: 'value', t: 'i32' }] },
+          500: { name: 'MoveRequest', fields: [{ n: 'direction_x', t: 'f32' }, { n: 'direction_y', t: 'f32' }, { n: 'speed', t: 'f32' }] },
+          501: { name: 'QuestRequest', fields: [{ n: 'quest_id', t: 'u32' }, { n: 'action_type', t: 'u8' }] },
+          502: { name: 'CombatRequest', fields: [{ n: 'skill_id', t: 'u32' }, { n: 'target_id', t: 'u64' }] },
+          503: { name: 'ReviveRequest', fields: [{ n: 'revive_type', t: 'u8' }] },
+          504: { name: 'UseItemRequest', fields: [{ n: 'item_id', t: 'u32' }, { n: 'slot', t: 'u8' }] },
+          505: { name: 'LoginRequest', fields: [{ n: 'lobby_version', t: 'u32' }, { n: 'account', t: 'string' }, { n: 'role_uin', t: 'u64' }, { n: 'role_name', t: 'string' }] },
+          506: { name: 'LoginResponse', fields: [{ n: 'result_id', t: 'i32' }, { n: 'role_uin', t: 'u64' }, { n: 'role_name', t: 'string' }] },
+          507: { name: 'EnterRoomRequest', fields: [{ n: 'room_id', t: 'i32' }] },
+          508: { name: 'EnterRoomResponse', fields: [{ n: 'result_id', t: 'i32' }, { n: 'room_id', t: 'i32' }] },
+          509: { name: 'SitDownRequest', fields: [{ n: 'room_id', t: 'i32' }, { n: 'table_id', t: 'i32' }, { n: 'seat_id', t: 'i8' }, { n: 'sit_down_type', t: 'i8' }, { n: 'table_name', t: 'string' }, { n: 'table_passwd', t: 'string' }, { n: 'game_map_id', t: 'i32' }, { n: 'game_mod', t: 'i32' }] },
+          510: { name: 'SitDownResponse', fields: [{ n: 'result_id', t: 'i32' }, { n: 'room_id', t: 'i32' }, { n: 'table_id', t: 'i32' }, { n: 'seat_id', t: 'i8' }] },
+          511: { name: 'StandUpRequest', fields: [{ n: 'room_id', t: 'i32' }, { n: 'table_id', t: 'i32' }, { n: 'mode', t: 'i32' }] },
+          512: { name: 'StandUpResponse', fields: [{ n: 'result_id', t: 'i32' }] },
+          513: { name: 'LeaveRoomRequest', fields: [{ n: 'room_id', t: 'i32' }] },
+          514: { name: 'LeaveRoomResponse', fields: [{ n: 'result_id', t: 'i32' }] },
+          516: { name: 'GameMoveRequest', fields: [{ n: 'player_uin', t: 'u64' }, { n: 'target_x', t: 'f32' }, { n: 'target_y', t: 'f32' }, { n: 'target_z', t: 'f32' }, { n: 'velocity_x', t: 'f32' }, { n: 'velocity_y', t: 'f32' }, { n: 'velocity_z', t: 'f32' }] },
+          517: { name: 'GameMoveResponse', fields: [{ n: 'result_code', t: 'i32' }, { n: 'current_x', t: 'f32' }, { n: 'current_y', t: 'f32' }, { n: 'current_z', t: 'f32' }] },
+          600: { name: 'RoomComponent', fields: [{ n: 'room_id', t: 'u32' }, { n: 'room_type', t: 'u8' }, { n: 'player_count', t: 'u8' }, { n: 'max_players', t: 'u8' }, { n: 'status', t: 'u8' }] },
+          601: { name: 'SeatComponent', fields: [{ n: 'seat_index', t: 'u8' }, { n: 'is_ready', t: 'u8' }, { n: 'player_uin', t: 'u64' }] },
+          700: { name: 'KeepAliveRequest', fields: [{ n: 'player_uin', t: 'u64' }, { n: 'timestamp', t: 'u64' }] },
+          701: { name: 'KeepAliveResponse', fields: [{ n: 'result_code', t: 'i32' }, { n: 'server_time', t: 'u64' }] }
+        };
+
+        const def = defs[id];
+        if (!def) return `[Unknown(${id})]`;
+
+        // Tag 组件只显示名称
+        if (!def.fields || def.fields.length === 0) {
+          return `[${def.name}]`;
+        }
+
+        // 解析字段值
+        let o = 8;
+        const parts = [`[${def.name}]`];
+        for (const f of def.fields.slice(0, 4)) { // 最多显示4个字段
+          let val;
+          switch (f.t) {
+            case 'u8': val = view.getUint8(o); o += 1; break;
+            case 'u16': val = view.getUint16(o, true); o += 2; break;
+            case 'u32': val = view.getUint32(o, true); o += 4; break;
+            case 'u64':
+              const lo = view.getUint32(o, true), hi = view.getUint32(o + 4, true);
+              val = `0x${(BigInt(hi) << 32n | BigInt(lo)).toString(16).slice(-8)}`;
+              o += 8;
+              break;
+            case 'i8': val = view.getInt8(o); o += 1; break;
+            case 'i16': val = view.getInt16(o, true); o += 2; break;
+            case 'i32': val = view.getInt32(o, true); o += 4; break;
+            case 'f32': val = view.getFloat32(o, true).toFixed(2); o += 4; break;
+            case 'f64': val = view.getFloat64(o, true).toFixed(2); o += 8; break;
+            case 'string':
+              const bytes = [];
+              while (o < buf.length) {
+                const c = view.getUint8(o);
+                if (!c) break;
+                bytes.push(c);
+                o++;
+              }
+              val = new TextDecoder().decode(new Uint8Array(bytes));
+              if (val.length > 10) val = val.slice(0, 10) + '...';
+              break;
+            default: val = '?';
+          }
+          parts.push(`${f.n}=${val}`);
+        }
+        if (def.fields.length > 4) parts.push('...');
+        return parts.join(' | ');
+      } catch (e) {
+        return '';
+      }
+    },
     openDialog() {
       this.$nextTick(() => {
         this.$refs.formatViewer.autoFormat();
@@ -331,3 +438,21 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+.value-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.value-preview {
+  color: #58a6ff;
+  font-weight: 600;
+  font-size: 12px;
+}
+.value-raw {
+  color: #8b949e;
+  font-size: 11px;
+  font-family: 'Monaco', 'Menlo', monospace;
+}
+</style>
