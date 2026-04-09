@@ -118,6 +118,8 @@ export default {
       oneTimeListLength: 0,
       scanStream: null,
       loadMoreDisable: false,
+      // 组件定义（会从 JSON 文件动态加载）
+      componentDefs: null,
     };
   },
   components: {
@@ -234,6 +236,93 @@ export default {
     getScanMatch() {
       return this.filterValue ? `*${this.filterValue}*` : '*';
     },
+
+    // 从 JSON 文件加载组件定义
+    loadComponentDefinitions() {
+      try {
+        // 使用 Node.js fs 模块从固定配置目录读取
+        const fs = require('fs');
+        const path = require('path');
+        const os = require('os');
+
+        // 固定配置路径: ~/.config/zigscript/components.json
+        const configPath = path.join(os.homedir(), '.config', 'zigscript', 'components.json');
+
+        if (!fs.existsSync(configPath)) {
+          console.warn('KeyContentHash: Component definitions not found at', configPath);
+          console.warn('Please run: zig build export-components');
+          return;
+        }
+
+        const data = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+
+        if (data && data.components && Array.isArray(data.components)) {
+          // 转换 JSON 格式到内部格式
+          const defs = {};
+          for (const comp of data.components) {
+            defs[comp.id] = {
+              name: comp.name,
+              fields: comp.fields.map(f => ({ n: f.name, t: f.type }))
+            };
+          }
+          this.componentDefs = defs;
+          console.log(`KeyContentHash: Loaded ${data.components.length} component definitions from ${configPath}`);
+        }
+      } catch (err) {
+        console.log('KeyContentHash: Failed to load component definitions JSON:', err);
+      }
+    },
+
+    // 获取默认组件定义（内置）
+    getDefaultComponentDefs() {
+      return {
+        10: { name: 'EntityUniqueID', fields: [{ n: 'unique_id', t: 'u64' }] },
+        11: { name: 'OwnerEntityUniqueID', fields: [{ n: 'owner_unique_id', t: 'u64' }] },
+        12: { name: 'EntityInitStatus', fields: [{ n: 'status', t: 'u8' }] },
+        13: { name: 'ServerEntityTag', fields: [] },
+        14: { name: 'GameRoomTag', fields: [] },
+        15: { name: 'GameTableTag', fields: [] },
+        16: { name: 'GameEntityTag', fields: [] },
+        17: { name: 'LocalGameEntityTag', fields: [] },
+        18: { name: 'RequestEntityTag', fields: [] },
+        19: { name: 'LocalRequestTag', fields: [] },
+        100: { name: 'Player', fields: [{ n: 'player_id', t: 'u64' }, { n: 'level', t: 'u32' }, { n: 'exp', t: 'u64' }, { n: 'nickname', t: 'string' }] },
+        101: { name: 'PlayerProperty', fields: [{ n: 'hp', t: 'i32' }, { n: 'max_hp', t: 'i32' }, { n: 'mp', t: 'i32' }, { n: 'max_mp', t: 'i32' }, { n: 'attack', t: 'i32' }, { n: 'defense', t: 'i32' }, { n: 'is_dead', t: 'u8' }, { n: 'level', t: 'u32' }, { n: 'exp', t: 'u64' }] },
+        102: { name: 'PlayerInfo', fields: [{ n: 'player_uin', t: 'u64' }, { n: 'game_id', t: 'u32' }, { n: 'gold', t: 'u32' }, { n: 'diamond', t: 'u32' }, { n: 'vip_level', t: 'u32' }] },
+        200: { name: 'AuthenRequest', fields: [{ n: 'account', t: 'string' }, { n: 'password', t: 'string' }, { n: 'app_id', t: 'u32' }, { n: 'device_type', t: 'u8' }, { n: 'login_type', t: 'u8' }] },
+        201: { name: 'AuthenResponse', fields: [{ n: 'result_code', t: 'i32' }, { n: 'player_uin', t: 'u64' }, { n: 'session_id', t: 'u64' }, { n: 'error_message', t: 'string' }] },
+        300: { name: 'Position', fields: [{ n: 'x', t: 'f32' }, { n: 'y', t: 'f32' }, { n: 'z', t: 'f32' }] },
+        301: { name: 'Velocity', fields: [{ n: 'vx', t: 'f32' }, { n: 'vy', t: 'f32' }, { n: 'vz', t: 'f32' }] },
+        302: { name: 'Rotation', fields: [{ n: 'pitch', t: 'f32' }, { n: 'yaw', t: 'f32' }, { n: 'roll', t: 'f32' }] },
+        400: { name: 'ClientState', fields: [{ n: 'is_background', t: 'u8' }, { n: 'afk_time_ms', t: 'u32' }] },
+        401: { name: 'SkillState', fields: [{ n: 'skill_id', t: 'u32' }, { n: 'last_use_time', t: 'u64' }, { n: 'cooldown', t: 'u32' }, { n: 'target_id', t: 'u64' }] },
+        402: { name: 'QuestState', fields: [{ n: 'quest_id', t: 'u32' }, { n: 'status', t: 'u8' }, { n: 'progress', t: 'u8' }] },
+        403: { name: 'Inventory', fields: [{ n: 'item_id_1', t: 'u32' }, { n: 'count_1', t: 'u32' }, { n: 'item_id_2', t: 'u32' }, { n: 'count_2', t: 'u32' }, { n: 'item_id_3', t: 'u32' }, { n: 'count_3', t: 'u32' }, { n: 'gold', t: 'u64' }] },
+        404: { name: 'CombatEffect', fields: [{ n: 'effect_type', t: 'u32' }, { n: 'effect_id', t: 'u32' }, { n: 'duration_ms', t: 'u32' }, { n: 'source_id', t: 'u64' }, { n: 'target_id', t: 'u64' }, { n: 'value', t: 'i32' }] },
+        500: { name: 'MoveRequest', fields: [{ n: 'direction_x', t: 'f32' }, { n: 'direction_y', t: 'f32' }, { n: 'speed', t: 'f32' }] },
+        501: { name: 'QuestRequest', fields: [{ n: 'quest_id', t: 'u32' }, { n: 'action_type', t: 'u8' }] },
+        502: { name: 'CombatRequest', fields: [{ n: 'skill_id', t: 'u32' }, { n: 'target_id', t: 'u64' }] },
+        503: { name: 'ReviveRequest', fields: [{ n: 'revive_type', t: 'u8' }] },
+        504: { name: 'UseItemRequest', fields: [{ n: 'item_id', t: 'u32' }, { n: 'slot', t: 'u8' }] },
+        505: { name: 'LoginRequest', fields: [{ n: 'lobby_version', t: 'u32' }, { n: 'account', t: 'string' }, { n: 'role_uin', t: 'u64' }, { n: 'role_name', t: 'string' }] },
+        506: { name: 'LoginResponse', fields: [{ n: 'result_id', t: 'i32' }, { n: 'role_uin', t: 'u64' }, { n: 'role_name', t: 'string' }] },
+        507: { name: 'EnterRoomRequest', fields: [{ n: 'room_id', t: 'i32' }] },
+        508: { name: 'EnterRoomResponse', fields: [{ n: 'result_id', t: 'i32' }, { n: 'room_id', t: 'i32' }] },
+        509: { name: 'SitDownRequest', fields: [{ n: 'room_id', t: 'i32' }, { n: 'table_id', t: 'i32' }, { n: 'seat_id', t: 'i8' }, { n: 'sit_down_type', t: 'i8' }, { n: 'table_name', t: 'string' }, { n: 'table_passwd', t: 'string' }, { n: 'game_map_id', t: 'i32' }, { n: 'game_mod', t: 'i32' }] },
+        510: { name: 'SitDownResponse', fields: [{ n: 'result_id', t: 'i32' }, { n: 'room_id', t: 'i32' }, { n: 'table_id', t: 'i32' }, { n: 'seat_id', t: 'i8' }] },
+        511: { name: 'StandUpRequest', fields: [{ n: 'room_id', t: 'i32' }, { n: 'table_id', t: 'i32' }, { n: 'mode', t: 'i32' }] },
+        512: { name: 'StandUpResponse', fields: [{ n: 'result_id', t: 'i32' }] },
+        513: { name: 'LeaveRoomRequest', fields: [{ n: 'room_id', t: 'i32' }] },
+        514: { name: 'LeaveRoomResponse', fields: [{ n: 'result_id', t: 'i32' }] },
+        516: { name: 'GameMoveRequest', fields: [{ n: 'player_uin', t: 'u64' }, { n: 'target_x', t: 'f32' }, { n: 'target_y', t: 'f32' }, { n: 'target_z', t: 'f32' }, { n: 'velocity_x', t: 'f32' }, { n: 'velocity_y', t: 'f32' }, { n: 'velocity_z', t: 'f32' }] },
+        517: { name: 'GameMoveResponse', fields: [{ n: 'result_code', t: 'i32' }, { n: 'current_x', t: 'f32' }, { n: 'current_y', t: 'f32' }, { n: 'current_z', t: 'f32' }] },
+        600: { name: 'RoomComponent', fields: [{ n: 'room_id', t: 'u32' }, { n: 'room_type', t: 'u8' }, { n: 'player_count', t: 'u8' }, { n: 'max_players', t: 'u8' }, { n: 'status', t: 'u8' }] },
+        601: { name: 'SeatComponent', fields: [{ n: 'seat_index', t: 'u8' }, { n: 'is_ready', t: 'u8' }, { n: 'player_uin', t: 'u64' }] },
+        700: { name: 'KeepAliveRequest', fields: [{ n: 'player_uin', t: 'u64' }, { n: 'timestamp', t: 'u64' }] },
+        701: { name: 'KeepAliveResponse', fields: [{ n: 'result_code', t: 'i32' }, { n: 'server_time', t: 'u64' }] }
+      };
+    },
+
     getZigscriptPreview(buf) {
       // 尝试解析 ZigScript 组件，返回预览字符串
       if (!buf || buf.length < 8) return '';
@@ -242,53 +331,8 @@ export default {
         const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
         const id = view.getUint16(4, true);
 
-        // 组件定义（名称 + 字段）
-        const defs = {
-          10: { name: 'EntityUniqueID', fields: [{ n: 'unique_id', t: 'u64' }] },
-          11: { name: 'OwnerEntityUniqueID', fields: [{ n: 'owner_unique_id', t: 'u64' }] },
-          12: { name: 'EntityInitStatus', fields: [{ n: 'status', t: 'u8' }] },
-          13: { name: 'ServerEntityTag', fields: [] },
-          14: { name: 'GameRoomTag', fields: [] },
-          15: { name: 'GameTableTag', fields: [] },
-          16: { name: 'GameEntityTag', fields: [] },
-          17: { name: 'LocalGameEntityTag', fields: [] },
-          18: { name: 'RequestEntityTag', fields: [] },
-          19: { name: 'LocalRequestTag', fields: [] },
-          100: { name: 'Player', fields: [{ n: 'player_id', t: 'u64' }, { n: 'level', t: 'u32' }, { n: 'exp', t: 'u64' }, { n: 'nickname', t: 'string' }] },
-          101: { name: 'PlayerProperty', fields: [{ n: 'hp', t: 'i32' }, { n: 'max_hp', t: 'i32' }, { n: 'mp', t: 'i32' }, { n: 'max_mp', t: 'i32' }, { n: 'attack', t: 'i32' }, { n: 'defense', t: 'i32' }, { n: 'is_dead', t: 'u8' }, { n: 'level', t: 'u32' }, { n: 'exp', t: 'u64' }] },
-          102: { name: 'PlayerInfo', fields: [{ n: 'player_uin', t: 'u64' }, { n: 'game_id', t: 'u32' }, { n: 'gold', t: 'u32' }, { n: 'diamond', t: 'u32' }, { n: 'vip_level', t: 'u32' }] },
-          200: { name: 'AuthenRequest', fields: [{ n: 'account', t: 'string' }, { n: 'password', t: 'string' }, { n: 'app_id', t: 'u32' }, { n: 'device_type', t: 'u8' }, { n: 'login_type', t: 'u8' }] },
-          201: { name: 'AuthenResponse', fields: [{ n: 'result_code', t: 'i32' }, { n: 'player_uin', t: 'u64' }, { n: 'session_id', t: 'u64' }, { n: 'error_message', t: 'string' }] },
-          300: { name: 'Position', fields: [{ n: 'x', t: 'f32' }, { n: 'y', t: 'f32' }, { n: 'z', t: 'f32' }] },
-          301: { name: 'Velocity', fields: [{ n: 'vx', t: 'f32' }, { n: 'vy', t: 'f32' }, { n: 'vz', t: 'f32' }] },
-          302: { name: 'Rotation', fields: [{ n: 'pitch', t: 'f32' }, { n: 'yaw', t: 'f32' }, { n: 'roll', t: 'f32' }] },
-          400: { name: 'ClientState', fields: [{ n: 'is_background', t: 'u8' }, { n: 'afk_time_ms', t: 'u32' }] },
-          401: { name: 'SkillState', fields: [{ n: 'skill_id', t: 'u32' }, { n: 'last_use_time', t: 'u64' }, { n: 'cooldown', t: 'u32' }, { n: 'target_id', t: 'u64' }] },
-          402: { name: 'QuestState', fields: [{ n: 'quest_id', t: 'u32' }, { n: 'status', t: 'u8' }, { n: 'progress', t: 'u8' }] },
-          403: { name: 'Inventory', fields: [{ n: 'item_id_1', t: 'u32' }, { n: 'count_1', t: 'u32' }, { n: 'item_id_2', t: 'u32' }, { n: 'count_2', t: 'u32' }, { n: 'item_id_3', t: 'u32' }, { n: 'count_3', t: 'u32' }, { n: 'gold', t: 'u64' }] },
-          404: { name: 'CombatEffect', fields: [{ n: 'effect_type', t: 'u32' }, { n: 'effect_id', t: 'u32' }, { n: 'duration_ms', t: 'u32' }, { n: 'source_id', t: 'u64' }, { n: 'target_id', t: 'u64' }, { n: 'value', t: 'i32' }] },
-          500: { name: 'MoveRequest', fields: [{ n: 'direction_x', t: 'f32' }, { n: 'direction_y', t: 'f32' }, { n: 'speed', t: 'f32' }] },
-          501: { name: 'QuestRequest', fields: [{ n: 'quest_id', t: 'u32' }, { n: 'action_type', t: 'u8' }] },
-          502: { name: 'CombatRequest', fields: [{ n: 'skill_id', t: 'u32' }, { n: 'target_id', t: 'u64' }] },
-          503: { name: 'ReviveRequest', fields: [{ n: 'revive_type', t: 'u8' }] },
-          504: { name: 'UseItemRequest', fields: [{ n: 'item_id', t: 'u32' }, { n: 'slot', t: 'u8' }] },
-          505: { name: 'LoginRequest', fields: [{ n: 'lobby_version', t: 'u32' }, { n: 'account', t: 'string' }, { n: 'role_uin', t: 'u64' }, { n: 'role_name', t: 'string' }] },
-          506: { name: 'LoginResponse', fields: [{ n: 'result_id', t: 'i32' }, { n: 'role_uin', t: 'u64' }, { n: 'role_name', t: 'string' }] },
-          507: { name: 'EnterRoomRequest', fields: [{ n: 'room_id', t: 'i32' }] },
-          508: { name: 'EnterRoomResponse', fields: [{ n: 'result_id', t: 'i32' }, { n: 'room_id', t: 'i32' }] },
-          509: { name: 'SitDownRequest', fields: [{ n: 'room_id', t: 'i32' }, { n: 'table_id', t: 'i32' }, { n: 'seat_id', t: 'i8' }, { n: 'sit_down_type', t: 'i8' }, { n: 'table_name', t: 'string' }, { n: 'table_passwd', t: 'string' }, { n: 'game_map_id', t: 'i32' }, { n: 'game_mod', t: 'i32' }] },
-          510: { name: 'SitDownResponse', fields: [{ n: 'result_id', t: 'i32' }, { n: 'room_id', t: 'i32' }, { n: 'table_id', t: 'i32' }, { n: 'seat_id', t: 'i8' }] },
-          511: { name: 'StandUpRequest', fields: [{ n: 'room_id', t: 'i32' }, { n: 'table_id', t: 'i32' }, { n: 'mode', t: 'i32' }] },
-          512: { name: 'StandUpResponse', fields: [{ n: 'result_id', t: 'i32' }] },
-          513: { name: 'LeaveRoomRequest', fields: [{ n: 'room_id', t: 'i32' }] },
-          514: { name: 'LeaveRoomResponse', fields: [{ n: 'result_id', t: 'i32' }] },
-          516: { name: 'GameMoveRequest', fields: [{ n: 'player_uin', t: 'u64' }, { n: 'target_x', t: 'f32' }, { n: 'target_y', t: 'f32' }, { n: 'target_z', t: 'f32' }, { n: 'velocity_x', t: 'f32' }, { n: 'velocity_y', t: 'f32' }, { n: 'velocity_z', t: 'f32' }] },
-          517: { name: 'GameMoveResponse', fields: [{ n: 'result_code', t: 'i32' }, { n: 'current_x', t: 'f32' }, { n: 'current_y', t: 'f32' }, { n: 'current_z', t: 'f32' }] },
-          600: { name: 'RoomComponent', fields: [{ n: 'room_id', t: 'u32' }, { n: 'room_type', t: 'u8' }, { n: 'player_count', t: 'u8' }, { n: 'max_players', t: 'u8' }, { n: 'status', t: 'u8' }] },
-          601: { name: 'SeatComponent', fields: [{ n: 'seat_index', t: 'u8' }, { n: 'is_ready', t: 'u8' }, { n: 'player_uin', t: 'u64' }] },
-          700: { name: 'KeepAliveRequest', fields: [{ n: 'player_uin', t: 'u64' }, { n: 'timestamp', t: 'u64' }] },
-          701: { name: 'KeepAliveResponse', fields: [{ n: 'result_code', t: 'i32' }, { n: 'server_time', t: 'u64' }] }
-        };
+        // 使用动态加载的组件定义，如果没有则使用默认的
+        const defs = this.componentDefs || this.getDefaultComponentDefs();
 
         const def = defs[id];
         if (!def) return `[Unknown(${id})]`;
@@ -435,6 +479,7 @@ export default {
   },
   mounted() {
     this.initShow();
+    this.loadComponentDefinitions();
   },
 };
 </script>
