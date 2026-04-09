@@ -52,6 +52,7 @@ import ViewerProtobuf from '@/components/viewers/ViewerProtobuf';
 import ViewerDeflateRaw from '@/components/viewers/ViewerDeflateRaw';
 import ViewerJavaSerialize from '@/components/viewers/ViewerJavaSerialize';
 import ViewerPickle from '@/components/viewers/ViewerPickle';
+import ViewerZigscript from '@/components/viewers/ViewerZigscript';
 
 export default {
   data() {
@@ -72,6 +73,7 @@ export default {
         { value: 'ViewerDeflate', text: 'Deflate' },
         { value: 'ViewerDeflateRaw', text: 'DeflateRaw' },
         { value: 'ViewerProtobuf', text: 'Protobuf' },
+        { value: 'ViewerZigscript', text: 'Zigscript' },
       ],
       selectStyle: {
         float: this.float,
@@ -96,6 +98,7 @@ export default {
     ViewerDeflateRaw,
     ViewerJavaSerialize,
     ViewerPickle,
+    ViewerZigscript,
   },
   props: {
     float: { default: 'right' },
@@ -217,6 +220,10 @@ export default {
       // deflateRaw
       if (this.$util.isDeflateRaw(this.content)) {
         return this.changeViewer('DeflateRaw');
+      }
+      // zigscript
+      if (this.$util.isZigscript(this.content)) {
+        return this.changeViewer('Zigscript');
       }
 
       // hex

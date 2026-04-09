@@ -161,6 +161,62 @@ export default {
 
     return false;
   },
+  isZigscript(buf) {
+    // ZigScript Component 格式检测
+    // C++ 兼容格式: [size:u16][version:u16][id:u16][flag:u16] = 8 bytes header + data
+    // 支持输入为 Buffer 或转义字符串两种格式
+
+    if (!buf) return false;
+
+    let buffer = buf;
+
+    // 如果是字符串，尝试从转义字符串转换为 Buffer
+    if (typeof buf === 'string') {
+      try {
+        // 处理 "\xHH" 转义格式的字符串 (如 ARDM/RedisInsight 显示的原始数据)
+        const unescaped = buf
+          .replace(/\\x([0-9a-fA-F]{2})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+          .replace(/\\n/g, '\n')
+          .replace(/\\r/g, '\r')
+          .replace(/\\t/g, '\t')
+          .replace(/\\\\/g, '\\');
+        buffer = Buffer.from(unescaped, 'binary');
+      } catch (e) {
+        return false;
+      }
+    }
+
+    if (!Buffer.isBuffer(buffer) || buffer.length < 8) {
+      return false;
+    }
+
+    try {
+      const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+
+      const size = view.getUint16(0, true);
+      const version = view.getUint16(2, true);
+      const componentId = view.getUint16(4, true);
+      const flag = view.getUint16(6, true);
+
+      // size 应该接近 buffer 长度（允许较大误差）
+      if (size > 65535) return false;
+      if (Math.abs(size - (buffer.length - 8)) > 512) return false;
+
+      // version 通常在 1-65535 范围内
+      if (version > 65535) return false;
+
+      // componentId 应该是已知的 ZigScript 组件 ID 或合理范围内的值
+      // 已知范围: 10-701 (core/tag/player/auth/position/state/request/room/game/system)
+      if (componentId < 10 || componentId > 10000) return false;
+
+      // flag 通常是 0 或小值
+      if (flag > 4096) return false;
+
+      return true;
+    } catch (e) {}
+
+    return false;
+  },
   zippedToString(buf, type = 'unzip') {
     const zlib = require('zlib');
     const funMap = {
